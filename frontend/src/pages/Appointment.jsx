@@ -1,95 +1,71 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { assets, doctors } from '../assets/assets_frontend/assets';
+import RelatedDoctors from '../components/RelatedDoctors';
 
 const Appointment = () => {
-  // Extract doctor ID from the URL params
   const { docId } = useParams();
-  
-  // Define the days of the week for displaying the date in a readable format
   const daysOfWeek = ['SUN', 'MON', 'TUES', 'WED', 'THU', 'FRI', 'SAT'];
 
-  // State to hold doctor information and available time slots
-  const [docInfo, setDocInfo] = useState();
+  const [docInfo, setDocInfo] = useState(null);
   const [docSlots, setDocSlots] = useState([]);
-  const [slotIndex, setSlotIndex] = useState(0); // To track the selected slot index
-  const [slotTime, setSlotTime] = useState(''); // To track the selected time for booking
+  const [slotIndex, setSlotIndex] = useState(0);
 
-  // Function to generate and fetch available time slots for the doctor
   const getAvailableSlots = async () => {
-    setDocSlots([]); // Reset the slots array on each fetch
+    setDocSlots([]);
+    let today = new Date();
 
-    let today = new Date(); // Get the current date
+    let generatedSlots = [];
 
-    // Loop to generate slots for the next 7 days
     for (let i = 0; i < 7; i++) {
       let currentDate = new Date(today);
       currentDate.setDate(today.getDate() + i);
 
-      // Set end time for the current day to 9 PM
-      let endTime = new Date(today);
-      endTime.setDate(today.getDate() + i + 1);
+      let endTime = new Date(currentDate);
       endTime.setHours(21, 0, 0, 0);
 
-      // Adjust start time for today (if it's today, start at current time but not earlier than 10 AM)
       if (today.getDate() === currentDate.getDate()) {
-        currentDate.setHours(currentDate.getHours() > 10 ? currentDate.getHours() + 1 : 10);
+        currentDate.setHours(Math.max(currentDate.getHours() + 1, 10));
         currentDate.setMinutes(currentDate.getMinutes() > 30 ? 30 : 0);
       } else {
-        currentDate.setHours(10); // For future days, set start time to 10 AM
-        currentDate.setMinutes(0);
+        currentDate.setHours(10, 0, 0, 0);
       }
 
-      // Array to hold the time slots for the current day
       let timeSlots = [];
-
-      // Loop to generate time slots every 30 minutes
       while (currentDate < endTime) {
         let formattedTime = currentDate.toLocaleTimeString([], {
           hour: '2-digit',
           minute: '2-digit'
         });
 
-        // Add the slot with datetime and formatted time
         timeSlots.push({
           datetime: new Date(currentDate),
           time: formattedTime
         });
 
-        currentDate.setMinutes(currentDate.getMinutes() + 30); // Increment by 30 minutes
+        currentDate.setMinutes(currentDate.getMinutes() + 30);
       }
-
-      // Add the generated slots for this day to the state
-      setDocSlots((prev) => [...prev, ...timeSlots]);
+      generatedSlots.push(timeSlots);
     }
+    setDocSlots(generatedSlots);
   };
 
-  // Fetch the available slots on docInfo change
   useEffect(() => {
     getAvailableSlots();
   }, [docInfo]);
 
-  // Log the available slots to the console for debugging
-  useEffect(() => {
-    console.log(docSlots);
-  }, [docSlots]);
-
-  // Fetch doctor information based on the docId from URL params
   const fetchDocInfo = async () => {
     const docInfo = doctors.find((doc) => doc._id === docId);
-    setDocInfo(docInfo); // Set the fetched doctor info to state
+    setDocInfo(docInfo);
   };
 
-  // Fetch doctor info whenever the docId or doctors list changes
   useEffect(() => {
     fetchDocInfo();
-  }, [doctors, docId]);
+  }, [docId]);
 
   return (
-    // Render the component only when docInfo is available
     docInfo && (
       <div>
-        {/* Doctor Information Section */}
         <div className='flex flex-col sm:flex-row gap-4'>
           <div>
             <img
@@ -127,26 +103,36 @@ const Appointment = () => {
           </div>
         </div>
 
-        {/* Booking Slots Section */}
         <div className="sm:ml-72 sm:pl-4 mt-4 font-medium text-gray-700">
           <p>Booking slots</p>
           <div className="flex gap-3 items-center w-full overflow-x-scroll mt-4">
-            {/* Render available slots */}
-            {docSlots.length &&
-              docSlots.map((item, index) => (
-                <div
-                  onClick={() => setSlotIndex(index)} // Set selected slot index on click
-                  className={`text-center py-6 min-w-16 rounded-full cursor-pointer ${
-                    slotIndex === index ? 'bg-primary text-white' : 'border border-gray-200'
-                  }`}
-                  key={index}
+            {docSlots.length > 0 &&
+              docSlots.map((slots, index) => (
+                <div 
+                  key={index} 
+                  onClick={() => setSlotIndex(index)} 
+                  className={`text-center py-6 min-w-16 rounded-full cursor-pointer ${slotIndex === index ? 'bg-primary text-white' : 'bg-white border border-gray-300'}`}
                 >
-                  <p>{daysOfWeek[item.datetime.getDay()]}</p> {/* Day of the week */}
-                  <p>{item.datetime.getDate()}</p> {/* Date */}
+                  <p>{daysOfWeek[slots[0].datetime.getDay()]}</p>
+                  <p>{slots[0].datetime.getDate()}</p>
                 </div>
               ))}
           </div>
+          <div className='flex items-center gap-3 w-full overflow-x-auto mt-4'>
+            {docSlots.length > 0 && docSlots[slotIndex] &&
+              docSlots[slotIndex].map((item, idx) => (
+                <p onClick={() => setSlotTime(item.time)}
+                  key={idx} 
+                  className={`text-sm font-light flex-shrink-0 px-5 py-2 rounded-full cursor-pointer ${item.time === slotIndex ? 'bg-primary text-white' : 'bg-white border border-gray-300'}`}
+                >
+                  {item.time}
+                </p>
+                
+              ))}
+          </div>
+          <button className='bg-primary text-white py-2 px-4 rounded-full mt-4'>Book an appointment</button>
         </div>
+        <RelatedDoctors docId={docId} speciality={docInfo.speciality} />
       </div>
     )
   );
